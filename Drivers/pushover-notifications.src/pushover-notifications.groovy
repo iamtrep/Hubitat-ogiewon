@@ -48,24 +48,30 @@ metadata {
     }
 
     preferences {
-        input("apiKey", "text", title: "API Key:", description: "Pushover API Key", submitOnChange:true)
-        input("userKey", "text", title: "User Key:", description: "Pushover User Key", submitOnChange:true)
-        if (keyFormatIsValid()) {
-            def deviceOptions = getCachedDeviceOptions()
-            if (deviceOptions) {
-                input("deviceName", "enum", title: "Device Name (Blank = All Devices):", description: "", multiple: true, required: false, options: deviceOptions)
-                input("priority", "enum", title: "Default Message Priority (Blank = NORMAL):", description: "", defaultValue: "0", options:[["-1":"LOW"], ["0":"NORMAL"], ["1":"HIGH"]])
-                def soundOptions = getCachedSoundOptions()
-                input("sound", "enum", title: "Notification Sound (Blank = App Default):", description: "", options: soundOptions)
-                input("url", "text", title: "Supplementary URL:", description: "")
-                input("urlTitle", "text", title: "URL Title:", description: "")
-                input("retry", "number", title: "Retry Interval in seconds:(30 minimum)", description: "Applies to Emergency Requests Only")
-                input("expire", "number", title: "Auto Expire After in seconds:(10800 max)", description: "Applies to Emergency Requests Only")
+        section("API setup") {
+            input("apiKey", "text", title: "API Key:", description: "Pushover API Key", submitOnChange:true)
+            input("userKey", "text", title: "User Key:", description: "Pushover User Key", submitOnChange:true)
+	        input name: "cacheRefreshInterval", type: "number", title: "Set cache refresh interval (seconds)", description: "Must be high enough to avoid throttling by Pushover API server", required: true, range: "30..10800", defaultValue: 30
+        }
+       	if (keyFormatIsValid()) {
+            section("Pushover Parameters") {
+                def deviceOptions = getCachedDeviceOptions()
+                if (deviceOptions) {
+                    input("deviceName", "enum", title: "Device Name (Blank = All Devices):", description: "", multiple: true, required: false, options: deviceOptions)
+                    input("priority", "enum", title: "Default Message Priority (Blank = NORMAL):", description: "", defaultValue: "0", options:[["-1":"LOW"], ["0":"NORMAL"], ["1":"HIGH"]])
+                    def soundOptions = getCachedSoundOptions()
+                    input("sound", "enum", title: "Notification Sound (Blank = App Default):", description: "", options: soundOptions)
+                    input("url", "text", title: "Supplementary URL:", description: "")
+                    input("urlTitle", "text", title: "URL Title:", description: "")
+                    input("retry", "number", title: "Retry Interval in seconds:(30 minimum)", description: "Applies to Emergency Requests Only")
+                    input("expire", "number", title: "Auto Expire After in seconds:(10800 max)", description: "Applies to Emergency Requests Only")
+                }
             }
     	}
-        input name: "cacheRefreshInterval", type: "number", title: "Set cache refresh interval (seconds)", description: "Must be high enough to avoid throttling by Pushover API server", required: true, range: "30..10800", defaultValue: 30
-        input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
-    }
+        section ("Logging") {
+			input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+		}
+	}
 }
 
 def logsOff(){
