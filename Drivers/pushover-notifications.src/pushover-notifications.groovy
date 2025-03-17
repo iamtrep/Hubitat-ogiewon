@@ -50,7 +50,7 @@ metadata {
     preferences {
         input("apiKey", "text", title: "API Key:", description: "Pushover API Key", submitOnChange:true)
         input("userKey", "text", title: "User Key:", description: "Pushover User Key", submitOnChange:true)
-        if (keysAreValid()) {
+        if (keyFormatIsValid()) {
             def deviceOptions = getDeviceOptions()
             if (deviceOptions) {
                 input("deviceName", "enum", title: "Device Name (Blank = All Devices):", description: "", multiple: true, required: false, options: deviceOptions)
@@ -91,7 +91,7 @@ def initialize() {
     state.version = version()
 }
 
-private boolean keysAreValid() {
+private boolean keyFormatIsValid() {
     return apiKey?.matches('[A-Za-z0-9]{30}') && userKey?.matches('[A-Za-z0-9]{30}')
 }
 
@@ -100,7 +100,7 @@ def getDeviceOptions(){
 
     def deviceOptions = null
 
-    if (keysAreValid()) {
+    if (keyFormatIsValid()) {
         def postBody = [
             token: "$apiKey",
             user: "$userKey",
@@ -127,7 +127,7 @@ def getDeviceOptions(){
             }
         }
         catch (Exception e) {
-            log.error "An invalid key was probably entered. PushOver Server Returned: ${e}"
+            log.error "PushOver Server Returned: ${e}"
         }
     }
     else {
@@ -141,7 +141,7 @@ def getDeviceOptions(){
 def getSoundOptions() {
     if (logEnable) log.debug "Generating Notification List..."
     def myOptions =[]
-    if (keysAreValid()) {
+    if (keyFormatIsValid()) {
         try{
             httpGet(uri: "https://api.pushover.net/1/sounds.json?token=${apiKey}"){response ->
                 if(response.status != 200) {
@@ -158,7 +158,7 @@ def getSoundOptions() {
             }
         }
         catch (Exception e) {
-            log.error "An invalid key was probably entered. PushOver Server Returned: ${e}"
+            log.error "PushOver Server Returned: ${e}"
         }
     }
     else {
@@ -354,7 +354,7 @@ def deviceNotification(message) {
     	body: postBody
     ]
 
-    if (keysAreValid()) {
+    if (keyFormatIsValid()) {
         try {
             httpPost(params) { response ->
                 if(response.status != 200) {
@@ -367,7 +367,7 @@ def deviceNotification(message) {
             }
         }
         catch (Exception e) {
-            log.error "An invalid key was probably entered. PushOver Server Returned: ${e}"
+            log.error "PushOver Server Returned: ${e}"
 	    }
     }
     else {
