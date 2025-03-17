@@ -51,11 +51,11 @@ metadata {
         input("apiKey", "text", title: "API Key:", description: "Pushover API Key", submitOnChange:true)
         input("userKey", "text", title: "User Key:", description: "Pushover User Key", submitOnChange:true)
         if (keyFormatIsValid()) {
-            def deviceOptions = getDeviceOptions()
+            def deviceOptions = getCachedDeviceOptions()
             if (deviceOptions) {
                 input("deviceName", "enum", title: "Device Name (Blank = All Devices):", description: "", multiple: true, required: false, options: deviceOptions)
                 input("priority", "enum", title: "Default Message Priority (Blank = NORMAL):", description: "", defaultValue: "0", options:[["-1":"LOW"], ["0":"NORMAL"], ["1":"HIGH"]])
-                def soundOptions = getSoundOptions()
+                def soundOptions = getCachedSoundOptions()
                 input("sound", "enum", title: "Notification Sound (Blank = App Default):", description: "", options: soundOptions)
                 input("url", "text", title: "Supplementary URL:", description: "")
                 input("urlTitle", "text", title: "URL Title:", description: "")
@@ -89,10 +89,40 @@ def updated() {
 
 def initialize() {
     state.version = version()
+
+    // key tracking
+    atomicState.lastApiKey = ""
+    atomicState.lastUserKey = ""
+
+    // Separate timestamps and caches for each method
+    atomicState.lastDeviceOptionsFetch = 0
+    atomicState.lastSoundOptionsFetch = 0
+    atomicState.cachedDeviceOptions = null
+    atomicState.cachedSoundOptions = null
 }
 
 private boolean keyFormatIsValid() {
     return apiKey?.matches('[A-Za-z0-9]{30}') && userKey?.matches('[A-Za-z0-9]{30}')
+}
+
+// Check if keys have changed and handle invalidation of all caches if they have
+private boolean checkAndHandleKeyChanges() {
+    if (atomicState.lastApiKey != apiKey || atomicState.lastUserKey != userKey) {
+        if (logEnable) log.debug "API keys have changed, invalidating all caches"
+
+        // Update the stored keys
+        atomicState.lastApiKey = apiKey
+        atomicState.lastUserKey = userKey
+
+        // Explicitly invalidate all caches
+        atomicState.cachedDeviceOptions = null
+        atomicState.cachedSoundOptions = null
+        atomicState.lastDeviceOptionsFetch = 0
+        atomicState.lastSoundOptionsFetch = 0
+
+        return true
+    }
+    return false
 }
 
 def getDeviceOptions(){
@@ -138,6 +168,32 @@ def getDeviceOptions(){
     return deviceOptions
 }
 
+// Create a cached wrapper for getDeviceOptions()
+def getCachedDeviceOptions() {
+    // First check if keys have changed (will invalidate all caches if they have)
+    checkAndHandleKeyChanges()
+
+    def currentTime = now()
+    def cacheTimeout = 30000 // 30 seconds in milliseconds
+
+    // Now check if our specific cache needs refreshing
+    if (atomicState.cachedDeviceOptions == null ||
+        (currentTime - atomicState.lastDeviceOptionsFetch) > cacheTimeout) {
+
+        if (logEnable) log.debug "Device options cache expired, fetching fresh data..."
+
+        // Update our cache
+        atomicState.cachedDeviceOptions = getDeviceOptions()
+        atomicState.lastDeviceOptionsFetch = currentTime
+
+        if (logEnable) log.debug "Cache updated with new device options"
+	} else {
+        if (logEnable) log.debug "Using cached device options"
+    }
+
+    return atomicState.cachedDeviceOptions
+}
+
 def getSoundOptions() {
     if (logEnable) log.debug "Generating Notification List..."
     def myOptions =[]
@@ -167,6 +223,34 @@ def getSoundOptions() {
     }
 
     return myOptions
+}
+
+def getCachedSoundOptions() {
+    // First check if keys have changed (will invalidate all caches if they have)
+    checkAndHandleKeyChanges()
+
+    def currentTime = now()
+    def cacheTimeout = 30000 // 30 seconds in milliseconds
+
+    // Now check if our specific cache needs refreshing
+    if (atomicState.cachedSoundOptions == null ||
+        (currentTime - atomicState.lastSoundOptionsFetch) > cacheTimeout) {
+
+        if (logEnable) log.debug "Sound options cache expired, fetching fresh data..."
+
+        // Get fresh sound options
+        def soundOptions = getSoundOptions()
+
+        // Update our cache atomically
+        atomicState.cachedSoundOptions = soundOptions
+        atomicState.lastSoundOptionsFetch = currentTime
+
+        if (logEnable) log.debug "Cache updated with new sound options"
+    } else {
+        if (logEnable) log.debug "Using cached sound options"
+    }
+
+    return atomicState.cachedSoundOptions
 }
 
 def speak(message, volume = null, voice = null) {
