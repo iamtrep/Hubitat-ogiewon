@@ -63,6 +63,7 @@ metadata {
                 input("expire", "number", title: "Auto Expire After in seconds:(10800 max)", description: "Applies to Emergency Requests Only")
             }
     	}
+        input name: "cacheRefreshInterval", type: "number", title: "Set cache refresh interval (seconds)", description: "Must be high enough to avoid throttling by Pushover API server", required: true, range: "30..10800", defaultValue: 30
         input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
     }
 }
@@ -174,7 +175,7 @@ def getCachedDeviceOptions() {
     checkAndHandleKeyChanges()
 
     def currentTime = now()
-    def cacheTimeout = 30000 // 30 seconds in milliseconds
+    def cacheTimeout = cacheRefreshInterval * 1000 // in milliseconds
 
     // Now check if our specific cache needs refreshing
     if (atomicState.cachedDeviceOptions == null ||
@@ -188,7 +189,7 @@ def getCachedDeviceOptions() {
 
         if (logEnable) log.debug "Cache updated with new device options"
 	} else {
-        if (logEnable) log.debug "Using cached device options"
+        if (logEnable) log.debug "Using cached device options (age=${currentTime - atomicState.lastDeviceOptionsFetch})"
     }
 
     return atomicState.cachedDeviceOptions
@@ -230,7 +231,7 @@ def getCachedSoundOptions() {
     checkAndHandleKeyChanges()
 
     def currentTime = now()
-    def cacheTimeout = 30000 // 30 seconds in milliseconds
+    def cacheTimeout = cacheRefreshInterval * 1000 // in milliseconds
 
     // Now check if our specific cache needs refreshing
     if (atomicState.cachedSoundOptions == null ||
@@ -247,7 +248,7 @@ def getCachedSoundOptions() {
 
         if (logEnable) log.debug "Cache updated with new sound options"
     } else {
-        if (logEnable) log.debug "Using cached sound options"
+        if (logEnable) log.debug "Using cached sound options (age=${currentTime - atomicState.lastSoundOptionsFetch})"
     }
 
     return atomicState.cachedSoundOptions
