@@ -633,6 +633,10 @@ def deviceNotification(message) {
                         def pollInterval = emPollInterval != null ? emPollInterval.toInteger() : 0
                         if (pollInterval > 0) {
                             if (pollInterval < 30) pollInterval = 30
+                            if (state.emergencyReceipt) {
+                                log.warn "New Emergency message sent while still polling receipt ${state.emergencyReceipt} — replacing"
+                                unschedule("checkEmergencyReceipt")
+                            }
                             state.emergencyReceipt = response.data.receipt
                             if (logEnable) log.debug "Emergency receipt: ${response.data.receipt}, polling every ${pollInterval}s"
                             sendEvent(name:"emergencyAck", value: "pending", descriptionText:"Emergency message sent, awaiting acknowledgement", isStateChange: true)
