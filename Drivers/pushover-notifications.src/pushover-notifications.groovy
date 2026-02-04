@@ -28,6 +28,7 @@
 *       2026-01-26 Dan Ogorchock         Added "ALL" to list of Pushover Devices, since there is no way to unselect a device once selected
 *       2026-02-01 @hubitrep             Call sendEvent() when message is sent to Pushover, allowing other automations to pick it up from this device.
 *       2026-02-02 Dan Ogorchock         Minor code cleanup and logic improvements
+*       2026-02-04 @hubitrep             Added Emergency acknowledgement receipt polling
 *
 *   Inspired by original work for SmartThings by: Zachary Priddy, https://zpriddy.com, me@zpriddy.com
 *
@@ -54,6 +55,7 @@
 *      [EM.RETRY=x] -- for emergency priority, how often does it get "sent" in x seconds (equivalent to ©retryinterval©)
 *      [EM.EXPIRE=y] -- for emergency priority, when should repeating stop in y seconds, even if not acknowledged (equivalent to ™expirelength™)
 *      [SELFDESTRUCT=z] -- auto delete message in z seconds (no equivalent)
+*      [EM.POLL=n] -- for emergency priority, poll for acknowledgement every n seconds (default: 30, no equivalent)
 *      \n -- line breaks in HTML messages. can also use ≤br≥ using the custom HTML characters feature below.
 *
 *      Set the custom HTML open and close characters to use additional HTML formatting. The default character is ≤ and ≥ (equivalent to [OPEN] and [CLOSE])
@@ -70,7 +72,7 @@
 
 import java.text.SimpleDateFormat
 
-def version() {return "v1.0.20260202"}
+def version() {return "v1.0.20260204"}
 
 metadata {
     definition (name: "Pushover", namespace: "ogiewon", author: "Dan Ogorchock", importUrl: "https://raw.githubusercontent.com/ogiewon/Hubitat/master/Drivers/pushover-notifications.src/pushover-notifications.groovy", singleThreaded:true) {
@@ -88,6 +90,7 @@ metadata {
         attribute "limitReset","Number"
         attribute "limitResetDate","String"
         attribute "limitLastUpdated","String"
+        attribute "emergencyAck","String"
 
     }
 
@@ -107,6 +110,7 @@ metadata {
                 input name: "ttl", type: "number", title: "Message Auto Delete After, in seconds", description: "Number of seconds message will live, before being deleted automatically.  Applies ONLY to Non-Emergency messages."
                 input name: "retry", type: "number", title: "Emergency Retry Interval in seconds:(minimum: 30)", description: "Applies to Emergency Requests Only"
                 input name: "expire", type: "number", title: "Emergency Auto Expire After in seconds:(maximum: 10800)", description: "Applies to Emergency Requests Only"
+                input name: "emPollInterval", type: "number", title: "Emergency Ack Poll Interval in seconds:(minimum: 30, 0 = disabled)", description: "How often to poll Pushover for Emergency message acknowledgement. Set to 0 to disable polling.", defaultValue: 0, range: "0..300"
             }
     	}
 		input name: "htmlOpen", type: "text", title: "HTML tag < character: ", description: "HE cleanses < and > characters from text input boxes.  Use this character or sequence as a substitute. (default: ≤) Ensure this is different from what is defined as >", defaultValue: "≤"
@@ -341,6 +345,7 @@ def deviceNotification(message) {
     def customRetry = null
     def customExpire = null
     def customTTL = null
+    def customEmPollInterval = null
     def imageData = null
     def html = "0"
     
@@ -497,6 +502,18 @@ def deviceNotification(message) {
             if (logEnable) log.debug "Pushover processed emergency expire (${expire}): " + message
         }
 
+        // Emergency acknowledgement poll interval override
+        if((matcher = message =~ /(\[EM.POLL=(\d+)\])/ )){
+            message = message.minus("${matcher[0][1]}")
+            message = message.trim()
+            customEmPollInterval = matcher[0][2]
+        }
+        if(customEmPollInterval){
+            emPollInterval = customEmPollInterval.toInteger()
+            if (emPollInterval > 0 && emPollInterval < 30){ emPollInterval = 30 }
+            if (logEnable) log.debug "Pushover processed emergency poll interval (${emPollInterval}): " + message
+        }
+
     }
     // End new code
 
@@ -609,6 +626,18 @@ def deviceNotification(message) {
                 else {
                     if (logEnable) log.debug "Msg sent to Pushover server"
                     sendEvent(name:"notificationText", value: message, descriptionText:"Msg sent to Pushover server", isStateChange: true)
+
+                    // For Emergency messages, capture receipt and start polling for acknowledgement
+                    if (priority == "2" && response.data.receipt) {
+                        def pollInterval = emPollInterval != null ? emPollInterval.toInteger() : 0
+                        if (pollInterval > 0) {
+                            if (pollInterval < 30) pollInterval = 30
+                            state.emergencyReceipt = response.data.receipt
+                            if (logEnable) log.debug "Emergency receipt: ${response.data.receipt}, polling every ${pollInterval}s"
+                            sendEvent(name:"emergencyAck", value: "pending", descriptionText:"Emergency message sent, awaiting acknowledgement", isStateChange: true)
+                            runIn(pollInterval, "checkEmergencyReceipt")
+                        }
+                    }
                 }
             }
         }
@@ -651,5 +680,54 @@ def getMsgLimits() {
     else {
         log.error "getMsgLimits() - API key '${apiKey}' or User key '${userKey}' is not properly formatted!"
 		return
+    }
+}
+
+def checkEmergencyReceipt() {
+    def receipt = state.emergencyReceipt
+    if (!receipt) {
+        if (logEnable) log.debug "checkEmergencyReceipt() - No receipt to check"
+        return
+    }
+
+    def uri = "https://api.pushover.net/1/receipts/${receipt}.json?token=${apiKey}"
+
+    try {
+        httpGet(uri) { response ->
+            if (response.status != 200) {
+                log.error "checkEmergencyReceipt() - Received HTTP error ${response.status}"
+                return
+            }
+
+            def data = response.data
+            if (logEnable) log.debug "checkEmergencyReceipt() - Response: acknowledged=${data.acknowledged}, expired=${data.expired}"
+
+            if (data.acknowledged == 1) {
+                def ackBy = data.acknowledged_by_device ?: "unknown device"
+                if (logEnable) log.debug "Emergency message acknowledged by ${ackBy}"
+                sendEvent(name:"emergencyAck", value: "acknowledged", descriptionText:"Emergency acknowledged by ${ackBy}", isStateChange: true)
+                state.emergencyReceipt = null
+                unschedule("checkEmergencyReceipt")
+                return
+            }
+
+            if (data.expired == 1) {
+                if (logEnable) log.debug "Emergency message expired without acknowledgement"
+                sendEvent(name:"emergencyAck", value: "expired", descriptionText:"Emergency expired without acknowledgement", isStateChange: true)
+                state.emergencyReceipt = null
+                unschedule("checkEmergencyReceipt")
+                return
+            }
+
+            // Still waiting — schedule next poll
+            def pollInterval = emPollInterval != null ? emPollInterval.toInteger() : 30
+            if (pollInterval < 30) pollInterval = 30
+            if (logEnable) log.debug "Emergency not yet acknowledged, polling again in ${pollInterval}s"
+            runIn(pollInterval, "checkEmergencyReceipt")
+        }
+    } catch (Exception e) {
+        log.error "checkEmergencyReceipt() - PushOver Server Returned: ${e}"
+        state.emergencyReceipt = null
+        unschedule("checkEmergencyReceipt")
     }
 }
