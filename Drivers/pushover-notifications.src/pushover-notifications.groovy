@@ -228,12 +228,13 @@ def getDeviceOptions(){
                 }
             }
         }
-        catch (Exception e) {
-            log.error "PushOver Server Returned: ${e}"
+        catch (groovyx.net.http.HttpResponseException e) {
+            log.error "getDeviceOptions() - PushOver Server Returned: ${e.message}"
+            log.error "getDeviceOptions() - Response body: ${e.response?.data?.errors}"
         }
     }
     else {
-        log.error "GetDeviceOptions() - API key '${apiKey}' or User key '${userKey}' is not properly formatted!"
+        log.error "getDeviceOptions() - API key '${apiKey}' or User key '${userKey}' is not properly formatted!"
     }
 
     return deviceOptions
@@ -284,12 +285,13 @@ def getSoundOptions() {
                 }
             }
         }
-        catch (Exception e) {
-            log.error "Error retrieving sound options - PushOver Server Returned: ${e}"
+        catch (groovyx.net.http.HttpResponseException e) {
+            log.error "getSoundOptions() - PushOver Server Returned: ${e.message}"
+            log.error "getSoundOptions() - Response body: ${e.response?.data?.errors}"
         }
     }
     else {
-        log.error "GetSoundsOptions() - API key '${apiKey}' or User key '${userKey}' is not properly formatted!"
+        log.error "getSoundOptions() - API key '${apiKey}' or User key '${userKey}' is not properly formatted!"
     }
 
     return myOptions
@@ -682,8 +684,9 @@ def getMsgLimits() {
                         sendEvent(name:"limitLastUpdated", value: sdf.format(new Date()))
                     }
                 }
-        } catch (Exception e) {
-            log.error "getMsgLimits() - PushOver Server Returned: ${e}"
+        } catch (groovyx.net.http.HttpResponseException e) {
+            log.error "getMsgLimits() - PushOver Server Returned: ${e.message}"
+            log.error "getMsgLimits() - Response body: ${e.response?.data?.errors}"
         }
     }
     else {
@@ -734,8 +737,9 @@ def checkEmergencyReceipt() {
             if (logEnable) log.debug "Emergency not yet acknowledged, polling again in ${pollInterval}s"
             runIn(pollInterval, "checkEmergencyReceipt")
         }
-    } catch (Exception e) {
-        log.error "checkEmergencyReceipt() - PushOver Server Returned: ${e}"
+    } catch (groovyx.net.http.HttpResponseException e) {
+        log.error "checkEmergencyReceipt() - PushOver Server Returned: ${e.message}"
+        log.error "checkEmergencyReceipt() - Response body: ${e.response?.data?.errors}"
         state.emergencyReceipt = null
         unschedule("checkEmergencyReceipt")
     }
