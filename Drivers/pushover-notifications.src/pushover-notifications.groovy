@@ -72,6 +72,7 @@
 */
 
 import java.text.SimpleDateFormat
+import groovyx.net.http.HttpResponseException
 
 def version() {return "v1.0.202602XX"}
 
@@ -228,7 +229,7 @@ def getDeviceOptions(){
                 }
             }
         }
-        catch (groovyx.net.http.HttpResponseException e) {
+        catch (HttpResponseException e) {
             log.error "getDeviceOptions() - PushOver Server Returned: ${e.message}"
             log.error "getDeviceOptions() - Response body: ${e.response?.data?.errors}"
         }
@@ -285,7 +286,7 @@ def getSoundOptions() {
                 }
             }
         }
-        catch (groovyx.net.http.HttpResponseException e) {
+        catch (HttpResponseException e) {
             log.error "getSoundOptions() - PushOver Server Returned: ${e.message}"
             log.error "getSoundOptions() - Response body: ${e.response?.data?.errors}"
         }
@@ -648,7 +649,7 @@ def deviceNotification(message) {
                 }
             }
         }
-        catch (groovyx.net.http.HttpResponseException e) {
+        catch (HttpResponseException e) {
             log.error "deviceNotification() - PushOver Server Returned: ${e.message}"
             log.error "deviceNotification() - Response body: ${e.response?.data.errors}"
         }
@@ -684,7 +685,7 @@ def getMsgLimits() {
                         sendEvent(name:"limitLastUpdated", value: sdf.format(new Date()))
                     }
                 }
-        } catch (groovyx.net.http.HttpResponseException e) {
+        } catch (HttpResponseException e) {
             log.error "getMsgLimits() - PushOver Server Returned: ${e.message}"
             log.error "getMsgLimits() - Response body: ${e.response?.data?.errors}"
         }
@@ -737,7 +738,7 @@ def checkEmergencyReceipt() {
             if (logEnable) log.debug "Emergency not yet acknowledged, polling again in ${pollInterval}s"
             runIn(pollInterval, "checkEmergencyReceipt")
         }
-    } catch (groovyx.net.http.HttpResponseException e) {
+    } catch (HttpResponseException e) {
         log.error "checkEmergencyReceipt() - PushOver Server Returned: ${e.message}"
         log.error "checkEmergencyReceipt() - Response body: ${e.response?.data?.errors}"
         state.emergencyReceipt = null
