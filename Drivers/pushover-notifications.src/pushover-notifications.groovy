@@ -29,7 +29,7 @@
 *       2026-02-01 @hubitrep             Call sendEvent() when message is sent to Pushover, allowing other automations to pick it up from this device.
 *       2026-02-02 Dan Ogorchock         Minor code cleanup and logic improvements
 *       2026-02-03 @hubitrep             Various minor code fixes
-*       2026-02-XX @hubitrep             Added Emergency acknowledgement receipt polling
+*       2026-02-XX @hubitrep             Added Emergency acknowledgement receipt polling and callback URL features
 *
 *   Inspired by original work for SmartThings by: Zachary Priddy, https://zpriddy.com, me@zpriddy.com
 *
@@ -56,6 +56,8 @@
 *      [EM.RETRY=x] -- for emergency priority, how often does it get "sent" in x seconds (equivalent to ©retryinterval©)
 *      [EM.EXPIRE=y] -- for emergency priority, when should repeating stop in y seconds, even if not acknowledged (equivalent to ™expirelength™)
 *      [EM.POLL=n] -- for emergency priority, poll for acknowledgement every n seconds (default: 30, no equivalent)
+*      [EM.CALLBACK=url] -- for emergency priority, URL that Pushover will POST to when acknowledged (no equivalent)
+*                           Tip: Use Maker API to create a callback endpoint (e.g. turn on a virtual switch)
 *      [SELFDESTRUCT=z] -- auto delete message in z seconds (no equivalent)
 *      \n -- line breaks in HTML messages. can also use ≤br≥ using the custom HTML characters feature below.
 *
@@ -113,6 +115,7 @@ metadata {
                 input name: "retry", type: "number", title: "Emergency Retry Interval in seconds:(minimum: 30)", description: "Applies to Emergency Requests Only"
                 input name: "expire", type: "number", title: "Emergency Auto Expire After in seconds:(maximum: 10800)", description: "Applies to Emergency Requests Only"
                 input name: "emPollInterval", type: "number", title: "Emergency Ack Poll Interval in seconds:(minimum: 30, 0 = disabled)", description: "How often to poll Pushover for Emergency message acknowledgement. Set to 0 to disable polling.", defaultValue: 0, range: "0..300"
+                input name: "emCallbackUrl", type: "text", title: "Emergency Callback URL:", description: "URL that Pushover will POST to when emergency is acknowledged. Use Maker API to create endpoint (e.g. turn on a virtual switch). Leave blank to disable."
             }
     	}
 		input name: "htmlOpen", type: "text", title: "HTML tag < character: ", description: "HE cleanses < and > characters from text input boxes.  Use this character or sequence as a substitute. (default: ≤) Ensure this is different from what is defined as >", defaultValue: "≤"
@@ -344,6 +347,7 @@ def deviceNotification(message) {
     def customExpire = null
     def customTTL = null
     def customEmPollInterval = null
+    def customEmCallbackUrl = null
     def imageData = null
     def html = "0"
     def rawMessage = message
@@ -517,6 +521,17 @@ def deviceNotification(message) {
             if (logEnable) log.debug "Pushover processed emergency poll interval (${emPollInterval}): " + message
         }
 
+        // Emergency acknowledgement callback URL override
+        if((matcher = message =~ /(\[EM.CALLBACK=(.*?)\])/ )){
+            message = message.minus("${matcher[0][1]}")
+            message = message.trim()
+            customEmCallbackUrl = matcher[0][2]
+        }
+        if(customEmCallbackUrl){
+            emCallbackUrl = customEmCallbackUrl
+            if (logEnable) log.debug "Pushover processed emergency callback URL (${emCallbackUrl}): " + message
+        }
+
     }
     // End new code
 
@@ -572,6 +587,9 @@ def deviceNotification(message) {
     }
     if (expire) {
         postBodyTop = postBodyTop + """Content-Disposition: form-data; name="expire"\r\n\r\n${expire}\r\n----d29vZHNieQ==\r\n"""
+    }
+    if (emCallbackUrl) {
+        postBodyTop = postBodyTop + """Content-Disposition: form-data; name="callback"\r\n\r\n${emCallbackUrl}\r\n----d29vZHNieQ==\r\n"""
     }
     if (ttl) {
         postBodyTop = postBodyTop + """Content-Disposition: form-data; name="ttl"\r\n\r\n${ttl}\r\n----d29vZHNieQ==\r\n"""
