@@ -163,13 +163,12 @@ def initialize() {
     atomicState.cachedDeviceOptions = null
     atomicState.cachedSoundOptions = null
 
-    //  Needs more input cleansing.
-    if (htmlOpen == null || htmlClose == null
-        || htmlOpen == '' || htmlClose == ''
-        || htmlOpen =~ /[\s\[\]\\]/ || htmlClose =~ /[\s\[\]\\]/
-    ) {
-    	htmlOpen = "≤"
-    	htmlClose = "≥"
+    // Reset invalid HTML open/close characters to defaults
+    if (htmlOpen == null || htmlOpen == '' || htmlOpen =~ /[\s\[\]\\]/) {
+        device.updateSetting("htmlOpen", [value: "≤", type: "text"])
+    }
+    if (htmlClose == null || htmlClose == '' || htmlClose =~ /[\s\[\]\\]/) {
+        device.updateSetting("htmlClose", [value: "≥", type: "text"])
     }
 }
 
