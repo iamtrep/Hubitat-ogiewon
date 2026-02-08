@@ -78,7 +78,7 @@ import java.text.SimpleDateFormat
 import groovyx.net.http.HttpResponseException
 import groovy.transform.Field
 
-def version() {return "v1.0.20260207"}
+def version() {return "v1.0.202602XX"}
 
 metadata {
     definition (name: "Pushover", namespace: "ogiewon", author: "Dan Ogorchock", importUrl: "https://raw.githubusercontent.com/ogiewon/Hubitat/master/Drivers/pushover-notifications.src/pushover-notifications.groovy", singleThreaded:true) {
