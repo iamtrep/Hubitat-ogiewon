@@ -364,7 +364,7 @@ def deviceNotification(message) {
     def imageData = null
     def html = "0"
     def rawMessage = message
-    
+
     if (logEnable) log.debug "Pushover driver raw message: ${rawMessage}"
 
     // Message priority
@@ -510,27 +510,24 @@ def deviceNotification(message) {
 
         // Emergency acknowledgement poll interval override
         if((matcher = EM_POLL_PATTERN.matcher(message)).find()){
-            message = message.minus("${matcher[0][1]}")
-            message = message.trim()
+            message = message.minus("${matcher[0][1]}").trim()
             customEmPollInterval = matcher[0][2]
-        }
-        if(customEmPollInterval){
-            emPollInterval = customEmPollInterval.toInteger()
-            if (emPollInterval > 0 && emPollInterval < 30){ emPollInterval = 30 }
-            if (logEnable) log.debug "Pushover processed emergency poll interval (${emPollInterval}): " + message
+            if(customEmPollInterval){
+                emPollInterval = customEmPollInterval.toInteger()
+                if (emPollInterval > 0 && emPollInterval < 30){ emPollInterval = 30 }
+                if (logEnable) log.debug "Pushover processed emergency poll interval (${emPollInterval}): " + message
+            }
         }
 
         // Emergency acknowledgement callback URL override
         if((matcher = EM_CALLBACK_PATTERN.matcher(message)).find()){
-            message = message.minus("${matcher[0][1]}")
-            message = message.trim()
+            message = message.minus("${matcher[0][1]}").trim()
             customEmCallbackUrl = matcher[0][2]
+            if(customEmCallbackUrl){
+                emCallbackUrl = customEmCallbackUrl
+                if (logEnable) log.debug "Pushover processed emergency callback URL (${emCallbackUrl}): " + message
+            }
         }
-        if(customEmCallbackUrl){
-            emCallbackUrl = customEmCallbackUrl
-            if (logEnable) log.debug "Pushover processed emergency callback URL (${emCallbackUrl}): " + message
-        }
-
     }
 
     // TTL Time to Live
@@ -561,7 +558,7 @@ def deviceNotification(message) {
 
     // OPTIMIZATION: Use StringBuilder for HTTP body construction
     def postBodyBuilder = new StringBuilder("""----d29vZHNieQ==\r\nContent-Disposition: form-data; name="user"\r\n\r\n$userKey\r\n----d29vZHNieQ==\r\nContent-Disposition: form-data; name="token"\r\n\r\n$apiKey\r\n----d29vZHNieQ==\r\n""")
-    
+
     if (title) {
         postBodyBuilder.append("""Content-Disposition: form-data; name="title"\r\n\r\n${title}\r\n----d29vZHNieQ==\r\n""")
     }
@@ -597,9 +594,9 @@ def deviceNotification(message) {
         postBodyBuilder.append("""Content-Disposition: form-data; name="html"\r\n\r\n${html}\r\n----d29vZHNieQ==\r\n""")
     }
     if (message == "") message = Character.toString((char) 128)
-    
+
     postBodyBuilder.append("""Content-Disposition: form-data; name="message"\r\n\r\n${message}\r\n----d29vZHNieQ==\r\n""")
-    
+
     if (imageData) {
         postBodyBuilder.append("""Content-Disposition: form-data; name="attachment"; filename="image.jpg"\r\nContent-Type: image/jpeg\r\n\r\n""")
     } else {
@@ -616,14 +613,14 @@ def deviceNotification(message) {
 
     ByteArrayOutputStream postBodyOutputStream = new ByteArrayOutputStream()
     postBodyOutputStream.write(postBodyTopArr)
-    
+
     if (imageData) {
         def bSize = imageData.available()
         byte[] imageArr = new byte[bSize]
         imageData.read(imageArr, 0, bSize)
         postBodyOutputStream.write(imageArr)
     }
-    
+
     postBodyOutputStream.write(postBodyBottomArr)
     byte[] postBody = postBodyOutputStream.toByteArray()
 
@@ -633,7 +630,7 @@ def deviceNotification(message) {
     	uri: "https://api.pushover.net/1/messages.json",
     	body: postBody
     ]
-    
+
     if (keyFormatIsValid()) {
         try {
             httpPost(params) { response ->
@@ -675,9 +672,9 @@ def deviceNotification(message) {
 }
 
 def getMsgLimits() {
-    
+
     if (keyFormatIsValid()) {
- 
+
         if (logEnable) log.debug "getMsgLimits() - Sending GET request: https://api.pushover.net/1/apps/limits.json?token=...${apiKey.substring(25,30)}"
 
 	    uri = "https://api.pushover.net/1/apps/limits.json?token=${apiKey}"
