@@ -423,7 +423,7 @@ def deviceNotification(message) {
     // Sound - two patterns for different formats to protect against greedy matches when using
     // a font color AND a sound, resulting in the cutting off a message
     if((matcher = SOUND_PATTERN.matcher(message)).find()){
-        log.debug "matcher = ${matcher}"
+        if (logEnable) log.debug "matcher = ${matcher}"
         message = message.minus(matcher.group(0)).trim()
         customSound = matcher.group(1).toLowerCase()
     } else if ((matcher = SOUND_BRACKET_PATTERN.matcher(message)).find()) {
@@ -588,7 +588,7 @@ def deviceNotification(message) {
         postBodyBuilder.append("""Content-Disposition: form-data; name="expire"\r\n\r\n${expire}\r\n----d29vZHNieQ==\r\n""")
     }
     if (emCallbackUrl) {
-        postBodyTop = postBodyTop + """Content-Disposition: form-data; name="callback"\r\n\r\n${emCallbackUrl}\r\n----d29vZHNieQ==\r\n"""
+        postBodyBuilder.append("""Content-Disposition: form-data; name="callback"\r\n\r\n${emCallbackUrl}\r\n----d29vZHNieQ==\r\n""")
     }
     if (ttl) {
         postBodyBuilder.append("""Content-Disposition: form-data; name="ttl"\r\n\r\n${ttl}\r\n----d29vZHNieQ==\r\n""")
@@ -645,18 +645,20 @@ def deviceNotification(message) {
 
                     sendEvent(name:"notificationText", value: rawMessage, descriptionText:"Msg sent to Pushover server", isStateChange: true)
 
-                    // For Emergency messages, capture receipt and start polling for acknowledgement
+                    // For Emergency messages, always capture receipt; optionally start polling
                     if (priority == "2" && response.data.receipt) {
+                        if (state.emergencyReceipt) {
+                            log.warn "New Emergency message sent while still tracking receipt ${state.emergencyReceipt} — replacing"
+                            unschedule("checkEmergencyReceipt")
+                        }
+                        state.emergencyReceipt = response.data.receipt
+                        sendEvent(name:"emergencyAck", value: "pending", descriptionText:"Emergency message sent, awaiting acknowledgement", isStateChange: true)
+                        if (logEnable) log.debug "Emergency receipt: ${response.data.receipt}"
+
                         def pollInterval = emPollInterval != null ? emPollInterval.toInteger() : 0
                         if (pollInterval > 0) {
                             if (pollInterval < 30) pollInterval = 30
-                            if (state.emergencyReceipt) {
-                                log.warn "New Emergency message sent while still polling receipt ${state.emergencyReceipt} — replacing"
-                                unschedule("checkEmergencyReceipt")
-                            }
-                            state.emergencyReceipt = response.data.receipt
-                            if (logEnable) log.debug "Emergency receipt: ${response.data.receipt}, polling every ${pollInterval}s"
-                            sendEvent(name:"emergencyAck", value: "pending", descriptionText:"Emergency message sent, awaiting acknowledgement", isStateChange: true)
+                            if (logEnable) log.debug "Polling for acknowledgement every ${pollInterval}s"
                             runIn(pollInterval, "checkEmergencyReceipt")
                         }
                     }
@@ -665,7 +667,7 @@ def deviceNotification(message) {
         }
         catch (HttpResponseException e) {
             log.error "deviceNotification() - PushOver Server Returned: ${e.message}"
-            log.error "deviceNotification() - Response body: ${e.response?.data.errors}"
+            log.error "deviceNotification() - Response body: ${e.response?.data?.errors}"
         }
     }
     else {
@@ -680,7 +682,7 @@ def getMsgLimits() {
 
         if (logEnable) log.debug "getMsgLimits() - Sending GET request: https://api.pushover.net/1/apps/limits.json?token=...${apiKey.substring(25,30)}"
 
-	    uri = "https://api.pushover.net/1/apps/limits.json?token=${apiKey}"
+	    def uri = "https://api.pushover.net/1/apps/limits.json?token=${apiKey}"
 
         try {
             httpGet(uri) { response ->
