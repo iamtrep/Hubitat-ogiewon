@@ -89,6 +89,9 @@ metadata {
 		command "getMsgLimits", [
             [name: "Get Messaging Limits", description: "Update the message limits information"]
         ]
+		command "cancelEmergencyMessage", [
+            [name: "Cancel Emergency Message", description: "Cancel the current emergency message using its receipt"]
+        ]
 
         attribute "emergencyAck","String"
         attribute "notificationText","String"
@@ -754,5 +757,43 @@ def checkEmergencyReceipt() {
         log.error "checkEmergencyReceipt() - Response body: ${e.response?.data?.errors}"
         state.emergencyReceipt = null
         unschedule("checkEmergencyReceipt")
+    }
+}
+
+def cancelEmergencyMessage() {
+    def receipt = state.emergencyReceipt
+    if (!receipt) {
+        log.warn "cancelEmergencyMessage() - No emergency receipt found in state"
+        return
+    }
+
+    if (!keyFormatIsValid()) {
+        log.error "cancelEmergencyMessage() - API key '${apiKey}' or User key '${userKey}' is not properly formatted!"
+        return
+    }
+
+    def postBody = [token: apiKey]
+
+    def params = [
+        uri: "https://api.pushover.net/1/receipts/${receipt}/cancel.json",
+        contentType: "application/json",
+        requestContentType: "application/x-www-form-urlencoded",
+        body: postBody
+    ]
+
+    try {
+        httpPost(params) { response ->
+            if (response.status != 200) {
+                log.error "cancelEmergencyMessage() - Received HTTP error ${response.status}"
+                return
+            }
+            if (logEnable) log.debug "cancelEmergencyMessage() - Emergency message cancelled successfully (receipt: ${receipt})"
+            sendEvent(name:"emergencyAck", value: "cancelled", descriptionText:"Emergency message cancelled by user", isStateChange: true)
+            state.emergencyReceipt = null
+            unschedule("checkEmergencyReceipt")
+        }
+    } catch (HttpResponseException e) {
+        log.error "cancelEmergencyMessage() - PushOver Server Returned: ${e.message}"
+        log.error "cancelEmergencyMessage() - Response body: ${e.response?.data?.errors}"
     }
 }
