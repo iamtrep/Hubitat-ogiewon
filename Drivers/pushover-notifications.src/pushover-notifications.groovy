@@ -658,8 +658,11 @@ def deviceNotification(message) {
                         def pollInterval = emPollInterval != null ? emPollInterval.toInteger() : 0
                         if (pollInterval > 0) {
                             if (pollInterval < 30) pollInterval = 30
+                            state.emergencyPollInterval = pollInterval
                             if (logEnable) log.debug "Polling for acknowledgement every ${pollInterval}s"
                             runIn(pollInterval, "checkEmergencyReceipt")
+                        } else {
+                            state.emergencyPollInterval = null
                         }
                     }
                 }
@@ -736,6 +739,7 @@ def checkEmergencyReceipt() {
                 if (logEnable) log.debug "Emergency message acknowledged by ${ackBy}"
                 sendEvent(name:"emergencyAck", value: "acknowledged", descriptionText:"Emergency acknowledged by ${ackBy}", isStateChange: true)
                 state.emergencyReceipt = null
+                state.emergencyPollInterval = null
                 unschedule("checkEmergencyReceipt")
                 return
             }
@@ -744,12 +748,13 @@ def checkEmergencyReceipt() {
                 if (logEnable) log.debug "Emergency message expired without acknowledgement"
                 sendEvent(name:"emergencyAck", value: "expired", descriptionText:"Emergency expired without acknowledgement", isStateChange: true)
                 state.emergencyReceipt = null
+                state.emergencyPollInterval = null
                 unschedule("checkEmergencyReceipt")
                 return
             }
 
-            // Still waiting — schedule next poll
-            def pollInterval = emPollInterval != null ? emPollInterval.toInteger() : 30
+            // Still waiting — schedule next poll using stored interval
+            def pollInterval = state.emergencyPollInterval ?: 30
             if (pollInterval < 30) pollInterval = 30
             if (logEnable) log.debug "Emergency not yet acknowledged, polling again in ${pollInterval}s"
             runIn(pollInterval, "checkEmergencyReceipt")
@@ -758,6 +763,7 @@ def checkEmergencyReceipt() {
         log.error "checkEmergencyReceipt() - PushOver Server Returned: ${e.message}"
         log.error "checkEmergencyReceipt() - Response body: ${e.response?.data?.errors}"
         state.emergencyReceipt = null
+        state.emergencyPollInterval = null
         unschedule("checkEmergencyReceipt")
     }
 }
@@ -792,6 +798,7 @@ def cancelEmergencyMessage() {
             if (logEnable) log.debug "cancelEmergencyMessage() - Emergency message cancelled successfully (receipt: ${receipt})"
             sendEvent(name:"emergencyAck", value: "cancelled", descriptionText:"Emergency message cancelled by user", isStateChange: true)
             state.emergencyReceipt = null
+            state.emergencyPollInterval = null
             unschedule("checkEmergencyReceipt")
         }
     } catch (HttpResponseException e) {
