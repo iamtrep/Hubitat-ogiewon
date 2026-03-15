@@ -482,9 +482,13 @@ void decodeAqaraStruct(String description) {
                 if (dataType == 0x23) {
                     rawValue = Integer.parseInt(valueHex[(i+10)..(i+11)] + valueHex[(i+8)..(i+9)] + valueHex[(i+6)..(i+7)] + valueHex[(i+4)..(i+5)], 16)
                     if (tag == 0x0D) {
-                        String fwVer = "${(rawValue >> 24) & 0xFF}.${(rawValue >> 16) & 0xFF}.${rawValue & 0xFFFF}"
+                        // matches fw version format reported in some reddit posts
+                        String fwVer = "${(rawValue >> 24) & 0xFF}.${(rawValue >> 16) & 0xFF}.0_${String.format("%02d%02d", (rawValue >> 8) & 0xFF, rawValue & 0xFF)}"
                         device.updateDataValue("aqaraVersion", fwVer)
-                        logDebug "Aqara firmware version (tag 0x0D): ${fwVer}"
+                        // same decoding as kkossev's driver
+                        String fwVerInt = "${(rawValue >> 24) & 0xFF}.${(rawValue >> 16) & 0xFF}.${rawValue & 0xFFFF}"
+                        device.updateDataValue("aqaraVersionInt", fwVerInt)
+                        logDebug "Aqara firmware version (tag 0x0D): ${fwVer} (${fwVerInt})"
                     } else {
                         logDebug "decodeAqaraStruct 4B tag=0x${valueHex[(i+0)..(i+1)]} val=${rawValue}"
                     }
