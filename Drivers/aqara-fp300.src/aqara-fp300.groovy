@@ -683,10 +683,6 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0402, 0x0000, [:], delay=200)
     cmds += zigbee.readAttribute(0x0405, 0x0000, [:], delay=200)
     cmds += zigbee.readAttribute(0x0400, 0x0000, [:], delay=200)
-    // Basic cluster – device details
-    cmds += zigbee.readAttribute(zigbee.BASIC_CLUSTER, [0x0004, 0x0005, 0x0006], [:], delay=200)
-    // Aqara proprietary struct – often contains firmware version and model
-    cmds += zigbee.readAttribute(0xFCC0, 0x00F7, [mfgCode: 0x115F], delay=200)
     sendZigbeeCommands(cmds)
 }
 
@@ -936,7 +932,13 @@ void fp300BlackMagic() {
     
     // Bind manufacturer cluster and read initial values
     cmds += ["zdo bind ${device.deviceNetworkId} 0x01 0x01 0xFCC0 {${device.zigbeeId}} {}"]
-    
+
+    // Read device details from Basic cluster
+    sendZigbeeCommands(zigbee.readAttribute(zigbee.BASIC_CLUSTER, [0x0004, 0x0005, 0x0006], [:], delay=200))
+
+    // Read Aqara proprietary struct (contains firmware version, etc.)
+    cmds += zigbee.readAttribute(0xFCC0, 0x00F7, [mfgCode: 0x115F], delay=200)
+
     // Call routine to send the Zigbee commands
     sendZigbeeCommands(cmds)
 }
