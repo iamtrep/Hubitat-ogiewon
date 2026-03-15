@@ -461,8 +461,6 @@ void decodeAqaraStruct(String description) {
                 rawValue = Integer.parseInt(valueHex[(i+6)..(i+7)] + valueHex[(i+4)..(i+5)], 16)
                 switch (tag) {
                     case 0x01: voltageAndBatteryEvents(rawValue / 1000.0); break
-                    case 0x05: device.updateDataValue("aqaraTag05", rawValue.toString()); logDebug "Aqara struct tag 0x05: ${rawValue}"; break
-                    case 0x0A: device.updateDataValue("aqaraTag0A", rawValue.toString()); logDebug "Aqara struct tag 0x0A: ${rawValue}"; break
                     case 0x17: sendVoltageEvent(rawValue / 1000.0); break
                     default:   logDebug "decodeAqaraStruct 2B unhandled tag=0x${valueHex[(i+0)..(i+1)]} val=${rawValue}"
                 }
