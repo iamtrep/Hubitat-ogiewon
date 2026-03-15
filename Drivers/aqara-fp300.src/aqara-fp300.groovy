@@ -197,8 +197,8 @@ private void parseAttribute(String description, Map descMap, Map it) {
             if (it.attrId == "0001") sendRttEvent()
             else if (it.attrId == "0004") { device.updateDataValue("manufacturer", it.value ?: ""); logDebug "Manufacturer: ${it.value}" }
             else if (it.attrId == "0005") {
-                if (it.value && it.value.length() > 2) { device.updateDataValue("model", it.value ?: ""); logDebug "Model: ${it.value}" }
-                else sendInfoEvent("Button was pressed – device awake for 15 min")
+                device.updateDataValue("model", it.value ?: ""); logDebug "Model: ${it.value}"
+                if (descMap.command == "0A") sendInfoEvent("Button was pressed – device awake for 15 min")
             }
             else if (it.attrId == "0006") { device.updateDataValue("dateCode", it.value ?: ""); logDebug "Date code: ${it.value}" }
             else if (it.attrId == "FF01") parseAqaraAttributeFF01(description)
@@ -219,8 +219,8 @@ private void parseAqaraClusterFCC0(String description, Map descMap, Map it) {
     int value = safeToInt(it.value)
     switch (it.attrId) {
         case "0005":
-            //logDebug "Device button pressed"
             logDebug "parseAqaraClusterFCC0 - Device button pressed"
+            sendInfoEvent("Button was pressed – device awake for 15 min")
             break
         case "0016" : // FP300 unknown report
             logDebug "<b>Received FP300 unknown report</b> (cluster=0x${it.cluster} attrId=0x${it.attrId} value=0x${it.value})"
