@@ -195,6 +195,7 @@ private void parseAttribute(String description, Map descMap, Map it) {
             break
         case "0000":
             if (it.attrId == "0001") sendRttEvent()
+            else if (it.attrId == "0004") { device.updateDataValue("manufacturer", it.value ?: ""); logDebug "Manufacturer: ${it.value}" }
             else if (it.attrId == "0005") {
                 if (it.value && it.value.length() > 2) { device.updateDataValue("model", it.value ?: ""); logDebug "Model: ${it.value}" }
                 else sendInfoEvent("Button was pressed – device awake for 15 min")
