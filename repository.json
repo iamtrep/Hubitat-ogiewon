@@ -13,6 +13,37 @@
               "Multi Sensors",
               "Motion Control"
             ]
+        },
+       {
+            "name": "Pushover",
+            "category": "Notifications",
+            "location": "https://raw.githubusercontent.com/ogiewon/Hubitat/refs/heads/master/Drivers/pushover-notifications.src/pushover-notifications.json",
+            "description": "Pushover Notifications Community Driver with addtional features",
+            "tags": [
+              "Notifications"
+            ]
+        },
+       {
+            "name": "Logitech Harmony Hub Parent",
+            "category": "Control",
+            "location": "https://raw.githubusercontent.com/ogiewon/Hubitat/refs/heads/master/Drivers/logitech-harmony-hub-parent.src/logitech-harmony-hub-parent.json",
+            "description": "Logitech Harmony Hub Parent driver, all local LAN communications.",
+            "tags": [
+              "IR & RF",
+			  "Multimedia",
+			  "LAN"
+            ]
+        },
+       {
+            "name": "IoTaWatt Parent",
+            "category": "Integrations",
+            "location": "https://raw.githubusercontent.com/ogiewon/Hubitat/refs/heads/master/Drivers/iotawatt-parent.src/iotawatt-parent.json",
+            "description": "IoTaWatt whole home energy monitoring system driver.",
+            "tags": [
+              "Energy Monitoring",
+			  "Monitoring",
+			  "LAN"
+            ]
         }
     ]
 }

@@ -21,11 +21,12 @@
  *                                          Removed aiInterferenceIdentification & aiSensitivityAdaptive user preferences, as setting these also messes up the mmWave calibration.  Will revisit if they are actually useful.
  *  1.0.9    2026-03-12    Dan Ogorchock    Replace @Field variables with traditional state variables.  @Field variables are reset each time the driver source code is saved, which can lead to unexpected behaviors.
  *                                          Added aiInterferenceIdentification & aiSensitivityAdaptive back as Advanced/Experimental user preferences. Only send these 2 setting to the FP300 if the value has changed. 
+ *  1.0.10   2026-03-17    Dan Ogorchock    Added Firmware Version info thanks to @hubitrep!
  *
  */
 
-static String version()   { "1.0.9" }
-static String timeStamp() { "2026/03/13 09:44" }
+static String version()   { "1.0.10" }
+static String timeStamp() { "2026/03/17 10:40" }
 
 import hubitat.device.Protocol
 import groovy.transform.Field
@@ -685,6 +686,11 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0402, 0x0000, [:], delay=200)
     cmds += zigbee.readAttribute(0x0405, 0x0000, [:], delay=200)
     cmds += zigbee.readAttribute(0x0400, 0x0000, [:], delay=200)
+    // Read device details from Basic cluster
+    cmds += zigbee.readAttribute(zigbee.BASIC_CLUSTER, [0x0004, 0x0005, 0x0006], [:], delay=200)
+    // Read Aqara proprietary struct (contains firmware version, etc.)
+    cmds += zigbee.readAttribute(0xFCC0, 0x00F7, [mfgCode: 0x115F], delay=200)
+
     sendZigbeeCommands(cmds)
 }
 
@@ -837,6 +843,7 @@ void configure() {
 
 void initialize() {
     log.info "${device.displayName} initialize() called"
+    runIn(5, "refresh")
     state.pirState    = device.currentValue("pirDetection") == "active"  ? 1 : 0
     state.mmwaveState = device.currentValue("roomState")   == "occupied" ? 1 : 0
 }
