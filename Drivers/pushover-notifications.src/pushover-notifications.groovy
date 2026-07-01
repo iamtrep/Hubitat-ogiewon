@@ -33,6 +33,9 @@
 *       2026-03-04 @hubitrep             Added Emergency acknowledgement receipt polling and callback URL features
 *       2026-05-22 @hubitrep             Always supply retry/expire for Emergency (priority=2) messages, falling back to defaults (60/900) when unset, to avoid Pushover HTTP 400 "expire must be supplied with priority=2"
 *       2026-05-22 @hubitrep             Guard null/blank custom HTML open/close chars in [HTML] processing to prevent NullPointerException (and message corruption) when those preferences were never persisted
+*       2026-07-01 @hubitrep             Firmware 2.5.1.x (Apache HttpClient 5) compat: send text messages with a String body — a byte[] body is corrupted (sent as its toString), which broke message sending (image attachments still require bytes)
+*       2026-07-01 @hubitrep             Firmware 2.5.1.x compat: pass GET tokens via the query: map, not embedded in the uri (2.5.1.x drops uri query strings) — fixes sound list, message limits, emergency-receipt polling
+*       2026-07-01 @hubitrep             deviceNotification(): log a stable HTTP status/error instead of the raw ExecutorHttpResponse object, and catch network/DNS errors that were previously uncaught
 *
 *   Inspired by original work for SmartThings by: Zachary Priddy, https://zpriddy.com, me@zpriddy.com
 *
@@ -80,7 +83,7 @@ import java.text.SimpleDateFormat
 import groovyx.net.http.HttpResponseException
 import groovy.transform.Field
 
-def version() {return "v1.0.20260522"}
+def version() {return "v1.0.20260701"}
 
 metadata {
     definition (name: "Pushover", namespace: "ogiewon", author: "Dan Ogorchock", importUrl: "https://raw.githubusercontent.com/ogiewon/Hubitat/master/Drivers/pushover-notifications.src/pushover-notifications.groovy", singleThreaded:true) {
@@ -298,7 +301,7 @@ def getSoundOptions() {
     def myOptions =[]
     if (keyFormatIsValid()) {
         try{
-            httpGet(uri: "https://api.pushover.net/1/sounds.json?token=${apiKey}"){response ->
+            httpGet(uri: "https://api.pushover.net/1/sounds.json", query: [token: apiKey]){response ->
                 if(response.status != 200) {
                     log.error "Received HTTP error ${response.status}. Check your keys!"
                 }
@@ -648,7 +651,12 @@ def deviceNotification(message) {
     }
 
     postBodyOutputStream.write(postBodyBottomArr)
-    byte[] postBody = postBodyOutputStream.toByteArray()
+
+    // Firmware 2.5.1.x (Apache HttpClient 5) corrupts a byte[] request body — it sends the
+    // array's toString instead of the raw bytes. For text-only messages send a String body,
+    // which is unaffected. An image attachment needs the binary body, so it stays a byte[]
+    // (still broken on 2.5.1.x until the platform is fixed).
+    def postBody = imageData ? postBodyOutputStream.toByteArray() : (postBodyTop + postBodyBottom)
 
     def params = [
 	    requestContentType: "application/octet-stream",
@@ -692,8 +700,16 @@ def deviceNotification(message) {
             }
         }
         catch (HttpResponseException e) {
-            log.error "deviceNotification() - PushOver Server Returned: ${e.message}"
-            log.error "deviceNotification() - Response body: ${e.response?.data?.errors}"
+            int status = e.response?.status ?: 0
+            def errors = e.response?.data?.errors
+            // Log a stable, informative message — never the raw ExecutorHttpResponse
+            // object, whose per-call hash is useless and defeats downstream log dedup.
+            log.error "deviceNotification() - Pushover API returned HTTP ${status}: ${errors ?: 'error'}"
+        }
+        catch (java.net.UnknownHostException | java.net.SocketException | java.net.SocketTimeoutException e) {
+            // Network/DNS unreachable (e.g. router reboot) — previously uncaught and
+            // logged by the platform as a stack trace on every attempt.
+            log.error "deviceNotification() - Pushover unreachable: ${e.class.simpleName}"
         }
     }
     else {
@@ -708,10 +724,10 @@ def getMsgLimits() {
 
         if (logEnable) log.debug "getMsgLimits() - Sending GET request: https://api.pushover.net/1/apps/limits.json?token=...${apiKey.substring(25,30)}"
 
-	    def uri = "https://api.pushover.net/1/apps/limits.json?token=${apiKey}"
+	    def uri = "https://api.pushover.net/1/apps/limits.json"
 
         try {
-            httpGet(uri) { response ->
+            httpGet([uri: uri, query: [token: apiKey]]) { response ->
                 if(response.status != 200) {
                     log.error "Received HTTP error ${response.status}. Check your keys!"
                 }
@@ -745,10 +761,10 @@ def checkEmergencyReceipt() {
         return
     }
 
-    def uri = "https://api.pushover.net/1/receipts/${receipt}.json?token=${apiKey}"
+    def uri = "https://api.pushover.net/1/receipts/${receipt}.json"
 
     try {
-        httpGet(uri) { response ->
+        httpGet([uri: uri, query: [token: apiKey]]) { response ->
             if (response.status != 200) {
                 log.error "checkEmergencyReceipt() - Received HTTP error ${response.status}"
                 return
